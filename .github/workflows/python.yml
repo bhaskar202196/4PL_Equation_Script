@@ -1,0 +1,75 @@
+name: python-job
+
+on:
+  workflow_dispatch:
+    inputs:
+      sheet_id:
+        description: "Google Sheet ID"
+        required: true
+        type: string
+        default: "110SsmCzK7RqUp8Clv2ZjVArpIMa_oGhu75N2ZqeyLeU"
+      job_id:
+        description: "Job ID"
+        required: true
+        type: string
+        default: "manual-test"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run 4PL
+        env:
+          # from workflow_dispatch
+          SHEET_ID: ${{ github.event.inputs.sheet_id }}
+          JOB_ID: ${{ github.event.inputs.job_id }}
+
+          # your prefilled config
+          SHEET_NAME: Estradiol
+          X_RANGE: Q17:Q21
+          Y_RANGE: R17:R21
+          OUT_START_CELL: U17
+          WRITE_BACK: "true"
+
+          # service account
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          python run_4pl.py
+
+      - name: Upload result.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: result
+          path: result.json
+
+      - name: Send result to Apps Script (optional)
+        if: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL != '' }}
+        env:
+          WEBHOOK_URL: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.APPS_SCRIPT_WEBHOOK_SECRET }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          url = os.environ["WEBHOOK_URL"]
+          secret = os.environ["WEBHOOK_SECRET"]
+          data = json.load(open("result.json"))
+          data["secret"] = secret  # simple shared-secret check
+          req = urllib.request.Request(
+              url, data=json.dumps(data).encode(),
+              headers={"Content-Type": "application/json"}
+          )
+          with urllib.request.urlopen(req) as resp:
+              print(resp.status, resp.read().decode())
+          PY
