@@ -17,12 +17,28 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL }}
+      WEBHOOK_SECRET: ${{ secrets.APPS_SCRIPT_WEBHOOK_SECRET }}
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Preflight checks
+        run: |
+          if [ -z "${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}" ]; then
+            echo "::error::Missing repo secret GOOGLE_SERVICE_ACCOUNT_JSON"
+            exit 1
+          fi
+          if [ -z "${{ github.event.inputs.sheet_id }}" ]; then
+            echo "::error::Missing input sheet_id"
+            exit 1
+          fi
+          echo "Secrets and inputs look good."
 
       - name: Install deps
         run: |
@@ -31,18 +47,15 @@ jobs:
 
       - name: Run 4PL
         env:
-          # from workflow_dispatch
           SHEET_ID: ${{ github.event.inputs.sheet_id }}
           JOB_ID: ${{ github.event.inputs.job_id }}
 
-          # your prefilled config
           SHEET_NAME: Estradiol
           X_RANGE: Q17:Q21
           Y_RANGE: R17:R21
           OUT_START_CELL: U17
           WRITE_BACK: "true"
 
-          # service account
           GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
         run: |
@@ -55,17 +68,14 @@ jobs:
           path: result.json
 
       - name: Send result to Apps Script (optional)
-        if: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL != '' }}
-        env:
-          WEBHOOK_URL: ${{ secrets.APPS_SCRIPT_WEBHOOK_URL }}
-          WEBHOOK_SECRET: ${{ secrets.APPS_SCRIPT_WEBHOOK_SECRET }}
+        if: ${{ env.WEBHOOK_URL != '' }}
         run: |
           python - <<'PY'
           import json, os, urllib.request
-          url = os.environ["WEBHOOK_URL"]
-          secret = os.environ["WEBHOOK_SECRET"]
+          url = os.environ.get("WEBHOOK_URL", "")
+          secret = os.environ.get("WEBHOOK_SECRET", "")
           data = json.load(open("result.json"))
-          data["secret"] = secret  # simple shared-secret check
+          data["secret"] = secret
           req = urllib.request.Request(
               url, data=json.dumps(data).encode(),
               headers={"Content-Type": "application/json"}
