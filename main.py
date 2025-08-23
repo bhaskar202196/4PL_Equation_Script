@@ -1,10 +1,13 @@
 # main.py
+import os
 import numpy as np
 from scipy.optimize import curve_fit
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from typing import List
 from fastapi.middleware.cors import CORSMiddleware
+
+API_KEY = os.getenv("CLASSIC_TOKEN")
 
 app = FastAPI(title="4PL Curve Fitting API")
 origins = [
@@ -61,7 +64,12 @@ def fit_fourPL(x_data: np.ndarray, y_data: np.ndarray):
 
 
 @app.post("/fit_4pl", response_model=FourPLResponse)
-def fit_4pl_endpoint(payload: FourPLRequest):
+def fit_4pl_endpoint(payload: FourPLRequest, x_api_key: str = Header(None)):
+    if API_KEY is None:
+        raise HTTPException(status_code=500, detail="API key not configured on server")
+
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized")
     x = np.array(payload.x_data, dtype=float)
     y = np.array(payload.y_data, dtype=float)
 
