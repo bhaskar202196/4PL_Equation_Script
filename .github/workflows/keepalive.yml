@@ -1,0 +1,14 @@
+name: Keep Render API Awake
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   
+  workflow_dispatch:          
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl Render API /ping
+        run: |
+          curl -s https://your-service.onrender.com/ping || true

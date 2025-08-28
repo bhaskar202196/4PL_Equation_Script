@@ -68,3 +68,8 @@ def fit_4pl_endpoint(payload: FourPLRequest):
     a, b, c, d, r2 = fit_fourPL(x, y)
 
     return FourPLResponse(a=a, b=b, c=c, d=d, r2=r2)
+
+
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
