@@ -80,4 +80,5 @@ def fit_4pl_endpoint(payload: FourPLRequest, x_api_key: str = Header(None)):
 
 @app.get("/ping")
 def ping():
+    print("Ping endpoint was called!")
     return {"status": "ok"}
