@@ -11,4 +11,4 @@ jobs:
     steps:
       - name: Curl Render API /ping
         run: |
-          curl -s https://your-service.onrender.com/ping || true
+          curl -s https://fourpl-equation-script.onrender.com/ping || true
